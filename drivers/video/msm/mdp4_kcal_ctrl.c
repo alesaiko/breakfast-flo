@@ -41,28 +41,37 @@ struct kcal_lut_data {
 
 static inline void mdp4_kcal_update_pcc(struct kcal_lut_data *lut_data)
 {
+#define ADJ_COLOR(color) max(lut_data->color, lut_data->min) * PCC_ADJ
+
 	struct mdp_pcc_cfg_data pcc_config = {
 		.block = MDP_BLOCK_DMA_P,
 		.ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE,
-		.r = { .r = max(lut_data->red,   lut_data->min) * PCC_ADJ },
-		.g = { .g = max(lut_data->green, lut_data->min) * PCC_ADJ },
-		.b = { .b = max(lut_data->blue,  lut_data->min) * PCC_ADJ },
+		.r = { .r = ADJ_COLOR(red) },
+		.g = { .g = ADJ_COLOR(green) },
+		.b = { .b = ADJ_COLOR(blue) },
 	};
+	unsigned int adj;
 
 	/* MDP_PP_OPS_DISABLE is unsafe. Use default values as a workaround. */
 	if (unlikely(!lut_data->enable)) {
-		pcc_config.r.r = DEF_PCC * PCC_ADJ;
-		pcc_config.g.g = DEF_PCC * PCC_ADJ;
-		pcc_config.b.b = DEF_PCC * PCC_ADJ;
+		adj = DEF_PCC * PCC_ADJ;
+
+		pcc_config.r.r = adj;
+		pcc_config.g.g = adj;
+		pcc_config.b.b = adj;
 	} else if (lut_data->invert) {
+		adj = 0xFFFF << 16;
+
 		pcc_config.r.c  = pcc_config.g.c = pcc_config.b.c = 0x7FF8;
-		pcc_config.r.r |= (0xFFFF << 16);
-		pcc_config.g.g |= (0xFFFF << 16);
-		pcc_config.b.b |= (0xFFFF << 16);
+		pcc_config.r.r |= adj;
+		pcc_config.g.g |= adj;
+		pcc_config.b.b |= adj;
 	}
 
 	/* Push PCC configuration to MDP controller */
 	mdp4_pcc_cfg(&pcc_config); /* Cannot fail here */
+
+#undef ADJ_COLOR
 }
 
 #define create_one_rw_node(node)					\
